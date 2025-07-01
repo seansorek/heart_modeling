@@ -30,9 +30,24 @@ knitr::knit_hooks$set(chunk = function(x, options) {
 
 ```
 
-# Setup
+# Intro
+
+The goal of this project is to model a human heart to the very best of my ability. This problem is well studied, and my work will be heavily inspired by the many contributors to the iHEART project as well as the amazing book *Cardiovascular Mathematics* edited by Luca Formaggia, Alfio Quarteroni, and Alessandro Veneziani.
+
+The heart has a simple teleology. It is a pump (actually, two of them) that forces blood through the body. Unfortunately, the other three causes of the heart are all extremely complicated. For our purposes, there are three main systems we need to model:  electrophysiology, heart muscle mechanics, and hemodynamics. Further, all three systems interact significantly to make the heart function. As an oversimplification, the electrophysiology tells the heart muscle to contract at specific intervals, which then pumps blood either through the lungs or through the rest of our body. The fact all of this works perfectly nearly every second in most living animals is a terrifying miracle that I think about way too much now.
+
+Computing all of this is expensive. I have a good computer but I also have electricity bills and a pre-war apartment which retains heat like an oven. To help my poor AC unit, there are a LOT of numerical methods to optimize running this system. I'm writing my proof of concept in `R` just for convenience. I will then start implementing any optimizations or model reduction techniques I can find while transitioning code to `C++` using `Rcpp` as needed. Just in case you have a real-life reason to have a heart in your laptop, I deeply recommend using `lifex` ([link](https://doi.org/10.1016/j.softx.2022.101252)) instead of trying to replicate my attempts.
+
+Since I have zero budget and no access to a supercomputer, my success condition is to have a functioning, calibrated, three dimensional model. If I can do that, my performance metrics will be the model grid density and simulation time calculated per clock second as well as some visualization methods where you can see the whole thing working. I don't know how much time I'll be willing and able to dedicate to this, but I want it to look at least cool if not realistic. Considering this isn't a job and I will have much more important things to do after the summer, we'll see how well I can do on this.
+
+# Electrophysiology
+
+## 2D Monodomain Electrophysical Model
+
+This is a naive implementation which is slow but illustrative.
 
 ```{r}
+
 nx <- 50 # length of x direction
 ny <- 50 # length of y direction
 dx <- 0.1 # Spatial step size
@@ -45,11 +60,10 @@ nt <- t_total / dt  # Number of time steps
 chi <- 1.0  # cell surface to volume ratio
 D <- 0.1 # conductivity tensor, assumed 1D for easy multiplication
 c_m <- 1 # transmembrane capacitance
+
 ```
 
 $D$, the conductivity tensor, is a combined constant that represents some combination of $\chi$ and $C_m$. i.e. you dont need to have them all in the same model as long as the numbers are calibrated correctly. It can be modelled as either a scalar for simple models or a tensor to model propogation along fibers. Once I have a fiber field set up, I can use the tensor in the notes.
-
-# 2D  Monodomain Electrophysical Model
 
 ```{r}
 u <- array(0, dim = c(nx,ny))
@@ -76,7 +90,7 @@ for (t in 1:nt) {
   # forward euler using the monodomain equation
   u <- u + dt*(D * l - I_ion(u = u))
 
-  if (t %% 1000 == 0) {
+  if (t %% 2000 == 0) {
       pal <- character(nx*ny)
   for (i in 1:nx){
     for (j in 1:ny) {
@@ -94,3 +108,28 @@ for (t in 1:nt) {
 
 ```
 
+I need to add a term for applied ionic current but that shouldn't be too hard.
+
+## Myofibers
+
+Myofibers determine the electrical wave propagation. Represented by a collection of 3-tuples of vague undefined terms in the video I watched. I will read other parameterization frameworks and get something more specific. Once I have those, then we can incorporate the heterogenous electrical propagation through the $D$ variable.
+
+# Active / Passive Mechanics
+
+I was going to model this off of Guccione et al. 1991 but I cannot get access to it anywhere. My general understanding is we need to incorporate the muscle action through electrolyte movement determined by the electrical propogation previously modeled as well as stresses caused by the blood fluid dynamics.
+
+# Coupling Electrophysiology with Tissue Mechanics
+
+Read Regazzoni 2020. I will write more after I read this paper. I need an annotated bibliography atp. 
+
+# External Circulation
+
+Read Regazzoni, Salvador, et al. (2021). Generally, this can either be brute-forced or modeled using a zero-dimensional ODE system.
+
+# Fluid Dynamics
+
+God help me. Although I do love linear algebra, my undergrad decisions to take 5 linear algebra classes and 0 PDE classes is biting me rn. Thankfully, the fluid dynamics inside of the heart seem to be ""textbook"" (those quotation marks are doing a lot of work). The big complication is the movement of the heart tissue changing the boundaries wherein the blood can flow, but there appears to be a graceful framework (NS-ALE) to incorporate the moving boundary assuming that the mechanics model is set up a certain way with specific boundary conditions (see [this seminar](https://www.youtube.com/watch?v=j-8zfz-E73c) ). Yay for talented applied mathematicians.
+
+# Coupling Mechanics and Fluid Dynamics
+
+This is represented as a PDE system. It's written down in [this](https://www.youtube.com/watch?v=j-8zfz-E73c) seminar but I don't have a better citation atm. 
